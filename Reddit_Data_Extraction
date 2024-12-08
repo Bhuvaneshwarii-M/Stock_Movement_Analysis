@@ -1,0 +1,119 @@
+import praw
+import json
+from datetime import datetime, timezone, timedelta
+from textblob import TextBlob  # For sentiment analysis
+import yfinance as yf  # For fetching stock data
+import math  # For NaN checks
+import re  # For regex extraction
+
+# Step 1: Reddit Authentication
+reddit = praw.Reddit(
+    client_id='QjnPOG5Tx3U84SguHNp3zw',  # Replace with your Client ID
+    client_secret='pGwZcyLMzdJNOtlNoj7Celc8yePtKg',  # Replace with your Client Secret
+    user_agent='StockScrapper/1.0 by WaitBrilliant1758'  # Replace with your User Agent
+)
+
+# Step 2: Define the Subreddit and Query
+subreddit_name = 'stocks'  # Target subreddit
+stock_symbols = ['TSLA', 'AAPL', 'AMZN', 'GOOG', 'MSFT','JPM','BAC','GS','V','MA','JNJ','PFE','MRNA','UNH','KO','PEP','PG']  # List of stock symbols to track
+limit = 100  # Number of posts to fetch
+
+# Step 3: Function to fetch and cache stock data
+def get_stock_data_cached(stock_symbol, start_date, end_date):
+    """
+    Fetch and cache stock data for a range of dates.
+    """
+    stock = yf.Ticker(stock_symbol)
+    try:
+        stock_info = stock.history(start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'))
+        if stock_info.empty:
+            print(f"No data available for {stock_symbol} during this period.")
+            return None
+        return stock_info
+    except Exception as e:
+        print(f"Error fetching data for {stock_symbol}: {e}")
+        return None
+
+# Step 4: Function to get stock price and change for a specific date
+def get_stock_price_for_date(stock_info, post_date):
+    """
+    Get the stock price and change closest to the given post date.
+    """
+    try:
+        if stock_info is None or stock_info.empty:
+            return None, None
+        
+        # Convert the index to a list of dates and find the nearest date
+        available_dates = stock_info.index
+        nearest_date = min(available_dates, key=lambda d: abs(d - post_date))
+
+        # Get the stock price and percentage change for the nearest date
+        stock_price = stock_info.loc[nearest_date, 'Close']
+        price_change = stock_info['Close'].pct_change().loc[nearest_date] * 100
+
+        return stock_price, price_change
+    except Exception as e:
+        print(f"Error finding stock price for date {post_date}: {e}")
+        return None, None
+
+# Step 5: Function to extract stock price and change from text
+def extract_price_and_change_from_text(text):
+    price_pattern = r'\$?\b\d+(\.\d+)?\b'
+    change_pattern = r'\b[-+]?\d+(\.\d+)?%'  # Percentage changes
+    prices = re.findall(price_pattern, text)
+    changes = re.findall(change_pattern, text)
+    valid_prices = [float(price) for price in prices if price.replace('.', '', 1).isdigit()]
+    valid_changes = [float(change.strip('%')) for change in changes if change.replace('.', '', 1).replace('-', '', 1).isdigit()]
+    price = valid_prices[0] if valid_prices else None
+    change = valid_changes[0] if valid_changes else None
+    return price, change
+
+# Step 6: Main logic to scrape data
+data = []
+subreddit = reddit.subreddit(subreddit_name)
+
+# Fetch stock data for all symbols once (last 5 years)
+end_date = datetime.today()
+start_date = end_date - timedelta(days=5 * 365)
+cached_stock_data = {}
+for symbol in stock_symbols:
+    cached_stock_data[symbol] = get_stock_data_cached(symbol, start_date, end_date)
+
+for symbol in stock_symbols:
+    posts = subreddit.search(symbol, limit=limit)
+    
+    for post in posts:
+        post_date = datetime.fromtimestamp(post.created_utc, timezone.utc)
+        sentiment_analysis = TextBlob(post.title + " " + post.selftext if post.selftext else post.title)
+        sentiment_score = sentiment_analysis.sentiment.polarity
+        sentiment = "Positive" if sentiment_score > 0 else "Negative" if sentiment_score < 0 else "Neutral"
+        
+        mention_count = post.title.lower().count(symbol.lower()) + (post.selftext.lower().count(symbol.lower()) if post.selftext else 0)
+        text_content = post.title + " " + post.selftext if post.selftext else post.title
+        extracted_price, extracted_change = extract_price_and_change_from_text(text_content)
+        
+        # Use cached data if needed
+        if extracted_price is None or extracted_change is None:
+            stock_info = cached_stock_data.get(symbol)
+            extracted_price, extracted_change = get_stock_price_for_date(stock_info, post_date)
+        
+        data.append({
+    "post_id": post.id,
+    "post_text": text_content,
+    "post_date": post_date.strftime('%Y-%m-%d %H:%M:%S'),
+    "user_handle": post.author.name if post.author else "Unknown",
+    "sentiment": sentiment,
+    "sentiment_score": sentiment_score,
+    "mention_count": mention_count,
+    "stock_symbol": symbol,
+    "stock_price": extracted_price if extracted_price is not None and not math.isnan(extracted_price) else "Unavailable",
+    "price_change": extracted_change if extracted_change is not None and not math.isnan(extracted_change) else "Unavailable"
+})
+
+
+# Step 7: Save Data to JSON
+output_file = "reddit_stock_data_final.json"
+with open(output_file, "w") as file:
+    json.dump(data, file, indent=4)
+
+print(f"Data saved to {output_file}")
