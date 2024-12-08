@@ -1,0 +1,29 @@
+##IQR (Interquartile Range)
+
+def remove_outliers_with_iqr(X, y):
+    Q1 = np.percentile(y, 25)
+    Q3 = np.percentile(y, 75)
+    IQR = Q3 - Q1
+    # Define the bounds for outliers
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    mask = (y >= lower_bound) & (y <= upper_bound)
+    return X[mask], y[mask]
+
+# Apply outlier removal
+X_train_no_outliers, y_train_no_outliers = remove_outliers_with_iqr(X_train, y_train)
+# Before removing outliers
+plt.scatter(X_train[:, 1], y_train, color="blue", label="Before Outlier Removal")
+plt.xlabel("Year")
+plt.ylabel("Stock Price")
+plt.legend()
+plt.show()
+
+# After removing outliers
+plt.scatter(X_train_no_outliers[:, 1], y_train_no_outliers, color="green", label="After Outlier Removal")
+plt.xlabel("Year")
+plt.ylabel("Stock Price")
+plt.legend()
+plt.show()
+
+plot_best_fit_line(X_train_no_outliers, y_train_no_outliers, theta_opt, xlabel="Year", ylabel="Stock Price")
