@@ -2,10 +2,10 @@ Reddit Stock Sentiment Analysis and Stock Prediction
 This project aims to analyze Reddit posts related to stocks, extract sentiment data, match the posts with historical stock prices, and predict potential stock movements based on social media sentiment and stock price trends.
 
 Project Objectives::
-Extract Reddit posts from relevant subreddits like r/stocks to gather public sentiment on specific stock symbols.
-Perform sentiment analysis on Reddit posts to classify them as positive, negative, or neutral.
-Correlate Reddit sentiment with stock data by matching the dates, times, and stock symbols.
-Analyze stock price changes and predict trends based on sentiment and historical stock price movements.
+      Extract Reddit posts from relevant subreddits like r/stocks to gather public sentiment on specific stock symbols.
+      Perform sentiment analysis on Reddit posts to classify them as positive, negative, or neutral.
+      Correlate Reddit sentiment with stock data by matching the dates, times, and stock symbols.
+      Analyze stock price changes and predict trends based on sentiment and historical stock price movements.
 
 Technologies and Tools Used::
       Python: For data extraction, sentiment analysis, and stock price fetching.
